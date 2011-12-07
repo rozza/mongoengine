@@ -231,6 +231,7 @@ class ComplexBaseField(BaseField):
     """
 
     field = None
+    _dereferenced = False
 
     def __get__(self, instance, owner):
         """Descriptor to automatically dereference references.
@@ -239,11 +240,20 @@ class ComplexBaseField(BaseField):
             # Document class being used rather than a document object
             return self
 
-        from dereference import dereference
-        instance._data[self.name] = dereference(
-            instance._data.get(self.name), max_depth=1, instance=instance, name=self.name
-        )
+        if not self._dereferenced:
+            from dereference import dereference
+            instance._data[self.name] = dereference(
+                instance._data.get(self.name), max_depth=1, instance=instance, name=self.name
+            )
+            self._dereferenced = True
+
         return super(ComplexBaseField, self).__get__(instance, owner)
+
+    def __set__(self, instance, value):
+        """Descriptor for assigning a value to a field in a document.
+        """
+        instance._data[self.name] = value
+        instance._mark_as_changed(self.name)
 
     def to_python(self, value):
         """Convert a MongoDB-compatible type to a Python type.
