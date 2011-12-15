@@ -240,12 +240,17 @@ class ComplexBaseField(BaseField):
             # Document class being used rather than a document object
             return self
 
-        if not self._dereferenced:
-            from dereference import dereference
-            instance._data[self.name] = dereference(
-                instance._data.get(self.name), max_depth=1, instance=instance, name=self.name
-            )
-            self._dereferenced = True
+        # if not self._dereferenced:
+        #     from dereference import dereference
+        #     instance._data[self.name] = dereference(
+        #         instance._data.get(self.name), max_depth=1, instance=instance, name=self.name
+        #     )
+        #     self._dereferenced = True
+
+        from dereference import dereference
+        instance._data[self.name] = dereference(
+            instance._data.get(self.name), max_depth=1, instance=instance, name=self.name
+        )
 
         return super(ComplexBaseField, self).__get__(instance, owner)
 
@@ -734,6 +739,7 @@ class TopLevelDocumentMetaclass(DocumentMetaclass):
 class BaseDocument(object):
 
     _dynamic = False
+    _dynamic_lock = True
 
     def __init__(self, **values):
         signals.pre_init.send(self.__class__, document=self, values=values)
@@ -761,17 +767,20 @@ class BaseDocument(object):
 
         # Set any get_fieldname_display methods
         self.__set_field_display()
-        # Flag initialised
-        self._initialised = True
+
 
         if self._dynamic:
+            self._dynamic_lock = False
             for key, value in dynamic_data.items():
                 setattr(self, key, value)
+
+        # Flag initialised
+        self._initialised = True
         signals.post_init.send(self.__class__, document=self)
 
     def __setattr__(self, name, value):
         # Handle dynamic data only if an initialised dynamic document
-        if self._dynamic and getattr(self, '_initialised', False):
+        if self._dynamic and not self._dynamic_lock:
 
             field = None
             if not hasattr(self, name) and not name.startswith('_'):
