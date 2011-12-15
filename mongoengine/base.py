@@ -637,6 +637,8 @@ class TopLevelDocumentMetaclass(DocumentMetaclass):
                     base_meta['queryset_class'] = base._meta['queryset_class']
             try:
                 base_meta['objects'] = base.__getattribute__(base, 'objects')
+            except TypeError:
+                pass
             except AttributeError:
                 pass
 
@@ -746,6 +748,7 @@ class BaseDocument(object):
     _dynamic = False
     _dynamic_lock = True
     _initialised = False
+    _created = True
 
     def __init__(self, **values):
         signals.pre_init.send(self.__class__, document=self, values=values)
@@ -772,7 +775,6 @@ class BaseDocument(object):
 
         # Set any get_fieldname_display methods
         self.__set_field_display()
-
 
         if self._dynamic:
             self._dynamic_lock = False
@@ -808,6 +810,11 @@ class BaseDocument(object):
             if hasattr(self, '_changed_fields'):
                 self._mark_as_changed(name)
             return
+
+        if not self._created and name in self._meta.get('shard_key', tuple()):
+            from queryset import OperationError
+            raise OperationError("Shard Keys are immutable. Tried to update %s" % name)
+
         super(BaseDocument, self).__setattr__(name, value)
 
     def __expand_dynamic_values(self, name, value):
@@ -934,6 +941,7 @@ class BaseDocument(object):
 
         obj = cls(**data)
         obj._changed_fields = changed_fields
+        obj._created = False
         return obj
 
     def _mark_as_changed(self, key):
@@ -1269,6 +1277,7 @@ class BaseDict(dict):
 
     def popitem(self, *args, **kwargs):
         self._mark_as_changed()
+
         super(BaseDict, self).popitem(*args, **kwargs)
 
     def _mark_as_changed(self):
