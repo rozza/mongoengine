@@ -233,7 +233,7 @@ class ComplexBaseField(BaseField):
 
         if not self._dereference and instance._initialised:
             from dereference import dereference
-            self._dereference = dereference  # Cache
+            self._dereference = dereference  # Cached
             instance._data[self.name] = self._dereference(
                 instance._data.get(self.name), max_depth=1, instance=instance,
                 name=self.name
@@ -247,6 +247,14 @@ class ComplexBaseField(BaseField):
             instance._data[self.name] = value
         elif isinstance(value, dict) and not isinstance(value, BaseDict):
             value = BaseDict(value, instance, self.name)
+            instance._data[self.name] = value
+
+        if self._dereference and instance._initialised and \
+            isinstance(value, (BaseList, BaseDict)) and not value._dereferenced:
+            value = self._dereference(
+                value, max_depth=1, instance=instance, name=self.name
+            )
+            value._dereferenced = True
             instance._data[self.name] = value
 
         return value
@@ -1155,11 +1163,13 @@ class BaseList(list):
     """A special list so we can watch any changes
     """
 
+    _dereferenced = False
+    _instance = None
+    _name = None
+
     def __init__(self, list_items, instance, name):
-        from mongoengine.dereference import dereference
         self._instance = instance
         self._name = name
-        self._dereference = dereference
         super(BaseList, self).__init__(list_items)
 
     def __setitem__(self, *args, **kwargs):
@@ -1207,33 +1217,26 @@ class BaseList(list):
         return super(BaseList, self).sort(*args, **kwargs)
 
     def _mark_as_changed(self):
-        if hasattr(self.instance, '_mark_as_changed'):
-            self.instance._mark_as_changed(self.name)
+        if hasattr(self._instance, '_mark_as_changed'):
+            self._instance._mark_as_changed(self._name)
 
 
 class BaseDict(dict):
     """A special dict so we can watch any changes
     """
 
-    _dereference = None
+    _dereferenced = False
     _instance = None
     _name = None
 
     def __init__(self, dict_items, instance, name):
-        from mongoengine.dereference import dereference
         self._instance = instance
         self._name = name
-        self._dereference = dereference
         super(BaseDict, self).__init__(dict_items)
 
     def __setitem__(self, *args, **kwargs):
-        self._updated()
+        self._mark_as_changed()
         super(BaseDict, self).__setitem__(*args, **kwargs)
-
-    def __getitem__(self, *args, **kwargs):
-        value = super(BaseDict, self).__setitem__(*args, **kwargs)
-        if isinstance(value, dict) and '_cls' in value:
-            value =
 
     def __delete__(self, *args, **kwargs):
         self._mark_as_changed()
@@ -1249,7 +1252,7 @@ class BaseDict(dict):
 
     def __getstate__(self):
         self.instance = None
-        self._dereference = None
+        self._dereferenced = False
         return self
 
     def __setstate__(self, state):
@@ -1269,8 +1272,8 @@ class BaseDict(dict):
         super(BaseDict, self).popitem(*args, **kwargs)
 
     def _mark_as_changed(self):
-        if hasattr(self.instance, '_mark_as_changed'):
-            self.instance._mark_as_changed(self.name)
+        if hasattr(self._instance, '_mark_as_changed'):
+            self._instance._mark_as_changed(self._name)
 
 if sys.version_info < (2, 5):
     # Prior to Python 2.5, Exception was an old-style class
