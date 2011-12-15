@@ -240,17 +240,12 @@ class ComplexBaseField(BaseField):
             # Document class being used rather than a document object
             return self
 
-        # if not self._dereferenced:
-        #     from dereference import dereference
-        #     instance._data[self.name] = dereference(
-        #         instance._data.get(self.name), max_depth=1, instance=instance, name=self.name
-        #     )
-        #     self._dereferenced = True
-
-        from dereference import dereference
-        instance._data[self.name] = dereference(
-            instance._data.get(self.name), max_depth=1, instance=instance, name=self.name
-        )
+        if not self._dereferenced and instance._initialised:
+            from dereference import dereference
+            instance._data[self.name] = dereference(
+                instance._data.get(self.name), max_depth=1, instance=instance, name=self.name
+            )
+            self._dereferenced = True
 
         return super(ComplexBaseField, self).__get__(instance, owner)
 
@@ -740,12 +735,12 @@ class BaseDocument(object):
 
     _dynamic = False
     _dynamic_lock = True
+    _initialised = False
 
     def __init__(self, **values):
         signals.pre_init.send(self.__class__, document=self, values=values)
 
         self._data = {}
-        self._initialised = False
 
         # Assign default values to instance
         for attr_name, field in self._fields.items():
