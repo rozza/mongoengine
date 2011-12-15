@@ -62,7 +62,7 @@ myNoddys = noddy.find()
     print "-" * 100
     print """Creating 10000 dictionaries - Pymongo"""
     t = timeit.Timer(stmt=stmt, setup=setup)
-    #print t.timeit(1)
+    print t.timeit(1)
 
     setup = """
 from pymongo import Connection
@@ -93,8 +93,6 @@ myNoddys = Noddy.objects()
     t = timeit.Timer(stmt=stmt, setup=setup)
     print t.timeit(1)
 
-    return
-
     stmt = """
 for i in xrange(10000):
     noddy = Noddy()
@@ -109,7 +107,7 @@ myNoddys = Noddy.objects()
     print "-" * 100
     print """Creating 10000 dictionaries - MongoEngine, safe=False, validate=False"""
     t = timeit.Timer(stmt=stmt, setup=setup)
-    #print t.timeit(1)
+    print t.timeit(1)
 
 
     stmt = """
